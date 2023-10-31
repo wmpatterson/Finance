@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Quote
+{% endblock %}
+
+{% block main %}
+<div class="section">
+
+    <h2>Transaction history</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Stock</th>
+                <th>Transaction type</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- TODO: Loop through the database entries to display them in this table -->
+            {% for transaction in transactions %}
+            <tr>
+                <td>{{ transaction.stock }}</td>
+                <td>{{ transaction.type }}</td>
+                <td>{{ transaction.price }}</td>
+                <td>{{ transaction.quantity }}</td>
+                <td>{{ transaction.purchase_date }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

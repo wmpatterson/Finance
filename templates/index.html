@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Index
+{% endblock %}
+
+{% block main %}
+<div class="section">
+
+    <h2>Stock lookup</h2>
+    <h3>Cash balance: ${{ cash_balance }}</h3>
+    <h3>Portfolio valuation: ${{ portfolio_valuation }}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Stocks</th>
+                <th>Shares</th>
+                <th>Current price</th>
+                <th>Total value of holding</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- TODO: Loop through the database entries to display them in this table -->
+            {% for stock in stocks_owned %}
+            <tr>
+                <td>{{ stock.stock }}</td>
+                <td>{{ stock.quantity }}</td>
+                <td>{{ stock.current_price | usd }}</td>
+                <td>{{ stock.holding_value | usd }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    cash NUMERIC NOT NULL DEFAULT 10000.00
+);
+
+CREATE TABLE portfolio (
+    user_portfolio_id SERIAL PRIMARY KEY,
+    stock TEXT NOT NULL,
+    quantity NUMERIC NOT NULL
+);
+
+CREATE TABLE transactions (
+    purchase_id SERIAL PRIMARY KEY,
+    type TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    stock TEXT NOT NULL,
+    price NUMERIC NOT NULL,
+    quantity NUMERIC NOT NULL,
+    order_total NUMERIC NOT NULL,
+    purchase_date TIMESTAMP NOT NULL
+);

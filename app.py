@@ -274,7 +274,7 @@ def sell():
 
         stock = request.form.get("symbol")
         stock_info = lookup(stock)
-        current_stock_price = stock_info["price"]
+        current_stock_price = stock_info['price']
         shares = float(request.form.get("shares"))
         users_stocks = new_fetch_rows("SELECT DISTINCT(stock) FROM portfolio WHERE user_portfolio_id = %s", (session["user_id"],))
         users_shares = new_fetch_rows(

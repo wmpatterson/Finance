@@ -161,3 +161,30 @@ def reformat_rows(rows: tuple) -> list:
         list: List of lists.
     """
     return [list(item) for item in rows]
+
+
+def new_fetch_rows(query, arguments=None):
+    connection = None
+    result = []
+    
+    try:
+        params = dbconfig()
+        connection = connect(**params)
+
+        with connection:
+            with connection.cursor() as crsr:
+                crsr.execute(query, arguments)
+                columns = [desc[0] for desc in crsr.description]
+                rows = crsr.fetchall()
+                
+                for row in rows:
+                    row_dict = {columns[i]: row[i] for i in range(len(columns))}
+                    result.append(row_dict)
+
+        return result
+    except (Exception, DatabaseError) as error:
+        print(error)
+        return result
+
+print(new_fetch_rows("SELECT * from USERS",))
+      

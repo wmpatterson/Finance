@@ -35,34 +35,37 @@ def after_request(response):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    cash_balance_rows = reformat_rows(
-        fetch_rows("SELECT cash FROM users WHERE id = %s;", (session["user_id"],))
-    )
+    cash_balance_rows = new_fetch_rows("SELECT cash FROM users WHERE id = %s;", (session["user_id"],))
+    print('cash balance rows:')
     print(cash_balance_rows)
-    cash_balance = int(cash_balance_rows[0][0])
+    cash_balance = int(cash_balance_rows[0]['cash'])
     print(f'CASH BALANCE IS OF TYPE {type(cash_balance)}')
 
     # Query db for the stocks owned and shares
-    stocks_owned = reformat_rows(
-        fetch_rows("SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s;", (session["user_id"],))
-    )
+    stocks_owned = new_fetch_rows("SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s;", (session["user_id"],))
+    
     print(f'STOCKS OWNED ARE: {stocks_owned}')
+    print(f' stocks owned is of type {type(stocks_owned)}')
 
     # If stocks owned is zero, remove from db
     for stock in stocks_owned:
-        if stock["quantity"] == 0.0:
-            modify_rows("DELETE FROM portfolio WHERE stock = %s;", stock["stock"])
+        stock_quantity = stock['quantity']
+        print(f'stock quantity is {stock_quantity}')
+        if stock_quantity == 0:
+            modify_rows("DELETE FROM portfolio WHERE stock = %s;", stock['stock'])
     # Query Yahoo Finance API to fetch current price and then calc holding value, add both values to respective dicts for stocks
         # Send stock name to lookup func
-        fetched_data = lookup(stock["stock"])
+        fetched_data = lookup(stock['stock'])
+ 
         # Create current price key in stock dict based on the price fetched using
-        stock["current_price"] = fetched_data["price"]
-        stock["holding_value"] = stock["current_price"] * float(stock["quantity"])
+        stock['current_price'] = fetched_data['price']
+        stock['holding_value'] = stock['current_price'] * float(stock['quantity'])
+        print(stock)
 
     total_stock_valuation = 0
     for stock in stocks_owned:
         total_stock_valuation += float(stock["holding_value"])
-
+    print(total_stock_valuation)
     # Calculate total portfolio valuation
  
     print(f'TOTAL STOCK VALUATION IS OF TYPE {type(total_stock_valuation)}')
@@ -104,7 +107,6 @@ def buy():
             # Check stock price
             stock_price = float(lookup(stock)["price"])
             # Check user's cash balance
-            #print(f'CURRENT USER IS {session["user_id"]}')
             user_balance = (fetch_row("SELECT cash from USERS WHERE id = %s;",(session["user_id"],)))[0]
             print(f'USER BALANCE IS: {user_balance}')
             # render apology if user cannot afford purchase
@@ -146,12 +148,12 @@ def buy():
 def history():
     """Show history of transactions"""
     if request.method == "GET":
-        transactions = fetch_rows(
-            "SELECT stock, type, price, quantity, purchase_date FROM transactions WHERE user_id = %s;", session["user_id"])
-
+        transactions = new_fetch_rows(
+            "SELECT stock, type, price, quantity, purchase_date FROM transactions WHERE user_id = %s;", (session["user_id"],))
+        print(f'here are the transactions" \n {transactions}')
         for trans in transactions:
-            trans["price"] = format(float(trans["price"]), ".2f")
-            trans["quantity"] = format(float(trans["quantity"]), ".2f")
+            trans['price'] = format(float(trans['price']), ".2f")
+            trans['quantity'] = format(float(trans['quantity']), ".2f")
         return render_template("history.html", transactions=transactions)
 
 
@@ -274,9 +276,9 @@ def sell():
         stock_info = lookup(stock)
         current_stock_price = stock_info["price"]
         shares = float(request.form.get("shares"))
-        users_stocks = fetch_rows("SELECT DISTINCT(stock) FROM portfolio WHERE user_portfolio_id = %s", session["user_id"])
-        users_shares = fetch_rows(
-            "SELECT quantity FROM portfolio WHERE user_portfolio_id = %s AND stock = %s", session["user_id"], stock)
+        users_stocks = new_fetch_rows("SELECT DISTINCT(stock) FROM portfolio WHERE user_portfolio_id = %s", (session["user_id"],))
+        users_shares = new_fetch_rows(
+            "SELECT quantity FROM portfolio WHERE user_portfolio_id = %s AND stock = %s", (session["user_id"], stock))
         stock_list = []
         for dict in users_stocks:
             stock_list.append(dict["stock"])
@@ -292,25 +294,32 @@ def sell():
             # Update transactions table with a sell order and also update their shares
             trans_dt = get_date_time()
             order_total = current_stock_price * shares
+            """ THIS QUERY IS EXECUTING"""
             modify_rows("INSERT INTO transactions (type, user_id, stock, price, quantity, order_total, purchase_date) VALUES (%s, %s, %s, %s, %s, %s, %s);",
-                    "sell", session["user_id"], stock, current_stock_price, shares, order_total, trans_dt)
+                    ("sell", session["user_id"], stock, current_stock_price, shares, order_total, trans_dt))
             # Update user's portfolio holdings of this stock
-            modify_rows("UPDATE portfolio SET quantity = (quantity - %s) WHERE stock = ? AND user_portfolio_id = %s",
-                    shares, stock, session["user_id"])
+            modify_rows("UPDATE portfolio SET quantity = (quantity - %s) WHERE stock = %s AND user_portfolio_id = %s",
+                    (shares, stock, session["user_id"]))
+            print(f'Updated shares of {stock} by - {shares}')
         # if stocks owned is zero, remove from db
-            stocks_owned = fetch_rows(
-                "SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s", session["user_id"])
+            """ THIS QUERY IS EXECUTING"""
+            stocks_owned = new_fetch_rows(
+                "SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s", (session["user_id"],))
+
             for stock in stocks_owned:
-                if stock["quantity"] == '0':
-                    modify_rows("DELETE FROM portfolio WHERE stock = %s", stock["stock"])
+                if stock['quantity'] == 0.0:
+                    modify_rows("DELETE FROM portfolio WHERE stock = %s", (stock['stock']))
             # Update user's cash balance
-            modify_rows("UPDATE users SET (cash) = (cash + %s) WHERE id = %s", order_total, session["user_id"])
+            modify_rows("UPDATE users SET cash = (cash + %s) WHERE id = %s", (order_total, session["user_id"]))
+            print('updated stock holdings')
             return redirect("/")
 
     elif request.method == "GET":
         # Query db for the stocks owned and shares
-        stocks_owned = fetch_rows(
-            "SELECT DISTINCT(stock), SUM(quantity) as quantity FROM transactions WHERE user_id = %s GROUP BY stock;", session["user_id"])
+        stocks_owned = new_fetch_rows(
+            "SELECT DISTINCT(stock), SUM(quantity) as quantity FROM portfolio WHERE user_portfolio_id = %s GROUP BY stock;", (session["user_id"],))
+        print('stocks owned to sell are:')
+        print(stocks_owned)
         return render_template("sell.html", stocks_owned=stocks_owned)
 
 

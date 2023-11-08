@@ -1,0 +1,1 @@
+Does the fetch rows function need modifying to return list of dicts, where each dict is a row entry's data

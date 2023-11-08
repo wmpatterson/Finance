@@ -1,9 +1,30 @@
-from helpers import fetch_rows, fetch_row, modify_rows, fetch_users, reformat_rows
-stock = 'TSLA'
+lst = [1,2,3]
 
-user_id_records = fetch_rows(
-                    "SELECT user_portfolio_id FROM portfolio WHERE stock = %s", ('TSLA',))
+lst.append(4)
 
-print(user_id_records)
-user_id_list = [t[0] for t in user_id_records]
-print(user_id_list)
+print(lst)
+
+def fetch_rows(query, arguments=None):
+    connection = None
+    result = []
+    
+    try:
+        params = dbconfig()
+        connection = connect(**params)
+
+        with connection:
+            with connection.cursor() as crsr:
+                crsr.execute(query, arguments)
+                columns = [desc[0] for desc in crsr.description]
+                rows = crsr.fetchall()
+                
+                for row in rows:
+                    row_dict = {columns[i]: row[i] for i in range(len(columns))}
+                    result.append(row_dict)
+
+        return result
+    except (Exception, DatabaseError) as error:
+        print(error)
+        return result
+
+print(fetch_rows(("SELECT cash from USERS WHERE id = %s;",(25,))))

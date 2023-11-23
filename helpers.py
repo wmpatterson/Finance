@@ -80,13 +80,12 @@ def usd(value):
     """Format value as USD."""
     return f"${value:,.2f}"
 
-
 def get_date_time():
 
     # datetime object containing current date and time
     now = datetime.datetime.now()
 
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
     return dt_string
 
 
@@ -95,6 +94,19 @@ def contains_number(input_string):
 
 
 def fetch_row(query, arguments):
+    """
+    Executes a SELECT query on the database using the provided SQL query and arguments,
+    fetching a single row and returning it as a  dictionary.
+
+    This function is designed for SELECT queries that retrieve rows from the database.
+    Each row is represented as a dictionary, where the keys are column names and
+    the values are the corresponding values in the row.
+
+    Parameters:
+    - query (str): The SQL SELECT query to be executed.
+    - arguments (tuple, optional): The arguments to be passed to the query placeholders.
+      Defaults to None.
+    """
     connection = None
     try:
         params = dbconfig()
@@ -104,12 +116,37 @@ def fetch_row(query, arguments):
             with connection.cursor() as crsr:
                 crsr.execute(query, arguments)
                 row = crsr.fetchone()
-                return row
+
+                if row is not None:
+                    # Get column names from cursor description
+                    column_names = [desc[0] for desc in crsr.description]
+
+                    # Create a dictionary with column names as keys
+                    row_dict = {column_names[i]: row[i] for i in range(len(column_names))}
+                    return row_dict
+                else:
+                    return None
     except(Exception, DatabaseError) as error:
         print(error)
 
+
 def fetch_rows(query, arguments=None):
+    """
+    Executes a SELECT query on the database using the provided SQL query and arguments,
+    fetching all resulting rows and returning them as a list of dictionaries.
+
+    This function is designed for SELECT queries that retrieve rows from the database.
+    Each row is represented as a dictionary, where the keys are column names and
+    the values are the corresponding values in the row.
+
+    Parameters:
+    - query (str): The SQL SELECT query to be executed.
+    - arguments (tuple, optional): The arguments to be passed to the query placeholders.
+      Defaults to None.
+    """
     connection = None
+    result = []
+    
     try:
         params = dbconfig()
         connection = connect(**params)
@@ -117,12 +154,29 @@ def fetch_rows(query, arguments=None):
         with connection:
             with connection.cursor() as crsr:
                 crsr.execute(query, arguments)
+                columns = [desc[0] for desc in crsr.description]
                 rows = crsr.fetchall()
-                return rows
-    except(Exception, DatabaseError) as error:
+                
+                for row in rows:
+                    row_dict = {columns[i]: row[i] for i in range(len(columns))}
+                    result.append(row_dict)
+
+        return result
+    except (Exception, DatabaseError) as error:
         print(error)
+        return result
 
 def modify_rows(query, arguments):
+    """
+    Executes a modification query on the database using the provided SQL query and arguments.
+
+    This function is designed for executing queries that modify the rows in the database,
+    such as INSERT, UPDATE, or DELETE statements.
+
+    Parameters:
+    - query (str): The SQL query to be executed.
+    - arguments (tuple): The arguments to be passed to the query placeholders.
+    """
     connection = None
     try:
         params = dbconfig()
@@ -161,30 +215,3 @@ def reformat_rows(rows: tuple) -> list:
         list: List of lists.
     """
     return [list(item) for item in rows]
-
-
-def new_fetch_rows(query, arguments=None):
-    connection = None
-    result = []
-    
-    try:
-        params = dbconfig()
-        connection = connect(**params)
-
-        with connection:
-            with connection.cursor() as crsr:
-                crsr.execute(query, arguments)
-                columns = [desc[0] for desc in crsr.description]
-                rows = crsr.fetchall()
-                
-                for row in rows:
-                    row_dict = {columns[i]: row[i] for i in range(len(columns))}
-                    result.append(row_dict)
-
-        return result
-    except (Exception, DatabaseError) as error:
-        print(error)
-        return result
-
-print(new_fetch_rows("SELECT * from USERS",))
-      

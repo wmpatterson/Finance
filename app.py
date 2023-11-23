@@ -35,17 +35,13 @@ def after_request(response):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    cash_balance_rows = new_fetch_rows("SELECT cash FROM users WHERE id = %s;", (session["user_id"],))
-    print('cash balance rows:')
-    print(cash_balance_rows)
+    cash_balance_rows = fetch_rows("SELECT cash FROM users WHERE id = %s;", (session["user_id"],))
     cash_balance = int(cash_balance_rows[0]['cash'])
-    print(f'CASH BALANCE IS OF TYPE {type(cash_balance)}')
 
     # Query db for the stocks owned and shares
-    stocks_owned = new_fetch_rows("SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s;", (session["user_id"],))
+    stocks_owned = fetch_rows("SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s;", (session["user_id"],))
     
     print(f'STOCKS OWNED ARE: {stocks_owned}')
-    print(f' stocks owned is of type {type(stocks_owned)}')
 
     # If stocks owned is zero, remove from db
     for stock in stocks_owned:
@@ -107,7 +103,7 @@ def buy():
             # Check stock price
             stock_price = float(lookup(stock)["price"])
             # Check user's cash balance
-            user_balance = (fetch_row("SELECT cash from USERS WHERE id = %s;",(session["user_id"],)))[0]
+            user_balance = (fetch_row("SELECT cash from USERS WHERE id = %s;",(session["user_id"],)))['cash']
             print(f'USER BALANCE IS: {user_balance}')
             # render apology if user cannot afford purchase
             order_total = stock_price * shares
@@ -116,8 +112,11 @@ def buy():
                 return apology("You don't have sufficient funds for this order!")
             else:
                 # Add purchase to transactions table
+                transaction_dt  = datetime.strptime(get_date_time(), '%d/%m/%Y %H:%M:%S').strftime('%Y-%m-%d %H:%M:%S')
+                print(f'TRANSACTION DT IS {transaction_dt}')
+
                 modify_rows("INSERT INTO transactions (type, user_id, stock, price, quantity, order_total, purchase_date) VALUES (%s, %s, %s, %s, %s, %s, %s);",
-                        ("buy", session["user_id"], stock, stock_price, shares, order_total, get_date_time()))
+                        ("buy", session["user_id"], stock, stock_price, shares, order_total, transaction_dt))
                 # Update user's cash balance
                 modify_rows("UPDATE users SET cash = cash - %s WHERE id = %s;", (order_total, session["user_id"]))
                 print('SUCCESSFULLY UPDATED USERS BALANCE')
@@ -126,11 +125,10 @@ def buy():
                 user_id_records = fetch_rows(
                     "SELECT user_portfolio_id FROM portfolio WHERE stock = %s", (stock,))
                 print(f'USER ID RECORDS IS: {user_id_records}')
-                user_id_list = [t[0] for t in user_id_records]
+                user_id_list = [t['user_portfolio_id'] for t in user_id_records]
                 # Creates list of users who own the stock being bought
                 print(f'USER WHO OWN {stock} ARE: { user_id_list}')
                 """This query will insert a new record for stock purchase if they haven't bought this stock before"""
-                print(session["user_id"])
                 if session["user_id"] not in user_id_list:
                     print('USER HAS NOT BOUGHT THIS STOCK BEFORE')
                     modify_rows("INSERT INTO portfolio (user_portfolio_id, stock, quantity) VALUES (%s, %s, %s);",
@@ -148,9 +146,10 @@ def buy():
 def history():
     """Show history of transactions"""
     if request.method == "GET":
-        transactions = new_fetch_rows(
+        transactions = fetch_rows(
             "SELECT stock, type, price, quantity, purchase_date FROM transactions WHERE user_id = %s;", (session["user_id"],))
         print(f'here are the transactions" \n {transactions}')
+        transactions = transactions[::-1]
         for trans in transactions:
             trans['price'] = format(float(trans['price']), ".2f")
             trans['quantity'] = format(float(trans['quantity']), ".2f")
@@ -160,37 +159,31 @@ def history():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     """Log user in"""
-
     # Forget any user_id
     session.clear()
-
-    
     # User reached route via GET (as by clicking a link or via redirect)
     if request.method == "GET":
        return render_template("login.html")
-
     # User reached route via POST (as by submitting a form via POST)
     else:
         # Ensure username was submitted
         if not request.form.get("username"):
             return apology("must provide username", 403)
-
         # Ensure password was submitted
         elif not request.form.get("password"):
             return apology("must provide password", 403)
-
+        
         username = request.form.get("username")
         # Query database for username
-        rows = reformat_rows(
-            fetch_rows("SELECT * FROM users WHERE username = %s", (username,))
-            )
+        rows = fetch_row("SELECT * FROM users WHERE username = %s", (username,))
+
         print(f'ROWS RETURNS {rows}')
         # Ensure username exists and password is correct
-        if len(rows) != 1 or not check_password_hash(rows[0][2], request.form.get("password")):
+        if not rows or not check_password_hash(rows['hash'], request.form.get("password")):
             return apology("invalid username and/or password", 403)
 
         # Remember which user has logged in
-        session["user_id"] = rows[0][0]
+        session["user_id"] = rows['id']
         print(session["user_id"])
 
         # Redirect user to home page
@@ -255,9 +248,10 @@ def register():
         else:
             modify_rows("INSERT INTO users (username, hash, cash) VALUES (%s, %s, %s);",
                       (username, generate_password_hash(password), 10000.00))
-            registrants = fetch_rows("""SELECT * FROM users WHERE username = %s;""", (username,))
-            print(f'CURRENT USER IS: {registrants[0][1]}')
-            session["user_id"] = registrants[0][0]
+            registrants = fetch_row("""SELECT * FROM users WHERE username = %s;""", (username,))
+            print(f'REGISTRANTS IS {registrants}')
+            print(f'CURRENT USER IS: {registrants["username"]}')
+            session["user_id"] = registrants['id']
             print(f' CURRENT SESSION ID IS: {session["user_id"]}')
             return render_template("login.html")
 
@@ -276,12 +270,12 @@ def sell():
         stock_info = lookup(stock)
         current_stock_price = stock_info['price']
         shares = float(request.form.get("shares"))
-        users_stocks = new_fetch_rows("SELECT DISTINCT(stock) FROM portfolio WHERE user_portfolio_id = %s", (session["user_id"],))
-        users_shares = new_fetch_rows(
+        users_stocks = fetch_rows("SELECT DISTINCT(stock) FROM portfolio WHERE user_portfolio_id = %s", (session["user_id"],))
+        users_shares = fetch_rows(
             "SELECT quantity FROM portfolio WHERE user_portfolio_id = %s AND stock = %s", (session["user_id"], stock))
-        stock_list = []
-        for dict in users_stocks:
-            stock_list.append(dict["stock"])
+        
+        stock_list = [dict["stock"] for dict in users_stocks]
+
         if not stock:
             return apology("You didn't select a stock!")
         elif stock not in stock_list:
@@ -292,18 +286,18 @@ def sell():
             return apology("You don't have that many shares to sell!")
         else:
             # Update transactions table with a sell order and also update their shares
-            trans_dt = get_date_time()
             order_total = current_stock_price * shares
+            transaction_dt = get_date_time()
+            print(f'TRANSACTION DT IS {transaction_dt}')
             """ THIS QUERY IS EXECUTING"""
             modify_rows("INSERT INTO transactions (type, user_id, stock, price, quantity, order_total, purchase_date) VALUES (%s, %s, %s, %s, %s, %s, %s);",
-                    ("sell", session["user_id"], stock, current_stock_price, shares, order_total, trans_dt))
+                    ("sell", session["user_id"], stock, current_stock_price, shares, order_total, transaction_dt))
             # Update user's portfolio holdings of this stock
             modify_rows("UPDATE portfolio SET quantity = (quantity - %s) WHERE stock = %s AND user_portfolio_id = %s",
                     (shares, stock, session["user_id"]))
-            print(f'Updated shares of {stock} by - {shares}')
+            print(f'Decreased shares of {stock} by {shares}')
         # if stocks owned is zero, remove from db
-            """ THIS QUERY IS EXECUTING"""
-            stocks_owned = new_fetch_rows(
+            stocks_owned = fetch_rows(
                 "SELECT DISTINCT(stock), quantity FROM portfolio WHERE user_portfolio_id = %s", (session["user_id"],))
 
             for stock in stocks_owned:
@@ -316,12 +310,11 @@ def sell():
 
     elif request.method == "GET":
         # Query db for the stocks owned and shares
-        stocks_owned = new_fetch_rows(
+        stocks_owned = fetch_rows(
             "SELECT DISTINCT(stock), SUM(quantity) as quantity FROM portfolio WHERE user_portfolio_id = %s GROUP BY stock;", (session["user_id"],))
         print('stocks owned to sell are:')
         print(stocks_owned)
         return render_template("sell.html", stocks_owned=stocks_owned)
-
 
 
 if __name__ == '__main__':
